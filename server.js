@@ -5,7 +5,7 @@ import cors from "cors";
 const app = express();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// REQUIRED
+// Middleware
 app.use(cors());
 app.use(express.json());
 
@@ -14,39 +14,37 @@ app.get("/", (req, res) => {
   res.send("SKLZ Checkout API is running");
 });
 
-// Main checkout route
-app.post("/create-checkout-session", async (req, res) => {
+// ✅ MAIN CHECKOUT ROUTE (THIS IS THE IMPORTANT ONE)
+app.get("/create-checkout-session", async (req, res) => {
   try {
-    console.log("CHECKOUT HIT:", req.body);
+    const { priceId } = req.query;
 
-    const { priceId } = req.body;
     if (!priceId) {
-      return res.status(400).json({ error: "Missing priceId" });
+      return res.status(400).send("Missing priceId");
     }
 
     const session = await stripe.checkout.sessions.create({
+      mode: "subscription", // OK for monthly & yearly
       line_items: [
         {
           price: priceId,
           quantity: 1,
         },
       ],
-      mode:
-        priceId === "price_1SgN3eF07IAsxK4LcLJ90hLf"
-          ? "payment" // Lifetime
-          : "subscription", // Monthly & Yearly
       success_url: "https://sklzlabs.com/success",
       cancel_url: "https://sklzlabs.com/cancel",
     });
 
-    res.json({ url: session.url });
+    // 🔁 Redirect user to Stripe Checkout
+    res.redirect(303, session.url);
+
   } catch (err) {
-    console.error("STRIPE ERROR:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("Stripe error:", err);
+    res.status(500).send("Checkout error");
   }
 });
 
-// Render port
+// Start server (Render handles PORT)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
