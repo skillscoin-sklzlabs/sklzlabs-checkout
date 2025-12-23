@@ -1,29 +1,18 @@
-app.get("/create-checkout-session", async (req, res) => {
-  try {
-    const { priceId } = req.query;
+// Fetch price details from Stripe
+const price = await stripe.prices.retrieve(priceId);
 
-    if (!priceId) {
-      return res.status(400).send("Missing priceId");
-    }
+// Decide checkout mode based on price type
+const mode = price.type === 'recurring' ? 'subscription' : 'payment';
 
-    // Detect if price is recurring or one-time
-    const price = await stripe.prices.retrieve(priceId);
-
-    const session = await stripe.checkout.sessions.create({
-      mode: price.recurring ? "subscription" : "payment",
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: "https://sklzlabs.com/success",
-      cancel_url: "https://sklzlabs.com/cancel",
-    });
-
-    res.redirect(303, session.url);
-  } catch (error) {
-    console.error("Stripe Checkout Error:", error);
-    res.status(500).send("Checkout error");
-  }
+const session = await stripe.checkout.sessions.create({
+  mode,
+  payment_method_types: ['card'],
+  line_items: [
+    {
+      price: priceId,
+      quantity: 1,
+    },
+  ],
+  success_url: SUCCESS_URL,
+  cancel_url: CANCEL_URL,
 });
